@@ -5,6 +5,21 @@ import { parse } from 'csv-parse/sync';
 
 @Injectable()
 export class CompaniesService {
+  private cleanValue(value: unknown): string {
+    return (value ?? '').toString().trim();
+  }
+
+  private collectFields(record: Record<string, unknown>, prefix: string, max: number): string[] {
+    const values: string[] = [];
+
+    for (let i = 1; i <= max; i++) {
+      const value = this.cleanValue(record[`${prefix} ${i}`]);
+      if (value) values.push(value);
+    }
+
+    return values;
+  }
+
   getCompanies() {
     const filePath = path.join(process.cwd(), 'dati.csv');
 
@@ -15,7 +30,7 @@ export class CompaniesService {
 
     const fileContent = fs.readFileSync(filePath, 'utf-8');
 
-    const records: any[] = parse(fileContent, {
+    const records: Record<string, unknown>[] = parse(fileContent, {
       delimiter: ';',
       columns: true,
       skip_empty_lines: true,
@@ -25,59 +40,58 @@ export class CompaniesService {
       trim: true,
     });
 
-    return records.map((record) => ({
-      nomeSocieta: record['Nome societ'] || '',
-      brandConsulenzaEsg: record['Nome del brand di consulenza ESG'] || '',
-      sitoWeb: record['Sito web'] || '',
-      email: record['Email'] || '',
-      telefono: record['Telefono'] || '',
-      annoFondazione: record['Anno fondazione'] || '',
-      purpose: record['Purpose'] || '',
+    return records.map((record, index) => {
+      const id = Number(this.cleanValue(record['id'])) || index + 1;
+      const nomeSocieta = this.cleanValue(record['Nome società']);
+      const brandConsulenzaEsg = this.cleanValue(record['Nome del brand di consulenza ESG']);
+      const sitoWeb = this.cleanValue(record['Sito web']);
 
-      sedi: [
-        record['Sede 1'],
-        record['Sede 2'],
-        record['Sede 3'],
-      ].filter(Boolean),
+      return {
+        id,
+        nomeSocieta,
+        brandConsulenzaEsg,
+        displayName:
+          nomeSocieta ||
+          brandConsulenzaEsg ||
+          sitoWeb ||
+          `Società ${id}`,
+        sitoWeb,
+        email: this.cleanValue(record['Email']),
+        telefono: this.cleanValue(record['Telefono']),
+        annoFondazione: this.cleanValue(record['Anno fondazione']),
+        annoInizioAttivitaEsg: this.cleanValue(
+          record["Anno di inizio dell'attività di consulenza Esg"]
+        ),
+        fasciaFatturatoComplessivo: this.cleanValue(
+          record['Fascia fatturato complessivo della società in Italia']
+        ),
+        fatturatoEsg: this.cleanValue(
+          record['Fatturato derivante da attività di consulenza e servizi Esg svolti in Italia']
+        ),
+        progettoEsgSignificativo: this.cleanValue(
+          record['Progetto Esg particolarmente significativo portato a termine da un vostro cliente nel 2024']
+        ),
+        particolaritaConsulenzaEsg: this.cleanValue(
+          record['Indicare le particolarità della società/brand nella consulenza Esg']
+        ),
+        fasciaNumeroDipendentiTotale: this.cleanValue(
+          record['Fascia numero complessivo dipendenti, e collaboratori se presenti, nella/e sede/i della società in Italia']
+        ),
+        fasciaNumeroDipendentiEsg: this.cleanValue(
+          record['Fascia numero dipendenti, e collaboratori se presenti, nella/e sede/i della società in Italia che svolgono attività in ambito Esg']
+        ),
+        purpose: this.cleanValue(record['Purpose']),
+        rendicontaFattoriEsg: this.cleanValue(
+          record['La società rendiconta le informazioni sui fattori ESG?']
+        ),
+        sedi: this.collectFields(record, 'Sede', 3),
+        clienti: this.collectFields(record, 'Cliente', 5),
+        servizi: this.collectFields(record, 'Servizio', 28),
+      };
+    });
+  }
 
-      clienti: [
-        record['Cliente 1'],
-        record['Cliente 2'],
-        record['Cliente 3'],
-        record['Cliente 4'],
-        record['Cliente 5'],
-      ].filter(Boolean),
-
-      servizi: [
-        record['Servizio 1'],
-        record['Servizio 2'],
-        record['Servizio 3'],
-        record['Servizio 4'],
-        record['Servizio 5'],
-        record['Servizio 6'],
-        record['Servizio 7'],
-        record['Servizio 8'],
-        record['Servizio 9'],
-        record['Servizio 10'],
-        record['Servizio 11'],
-        record['Servizio 12'],
-        record['Servizio 13'],
-        record['Servizio 14'],
-        record['Servizio 15'],
-        record['Servizio 16'],
-        record['Servizio 17'],
-        record['Servizio 18'],
-        record['Servizio 19'],
-        record['Servizio 20'],
-        record['Servizio 21'],
-        record['Servizio 22'],
-        record['Servizio 23'],
-        record['Servizio 24'],
-        record['Servizio 25'],
-        record['Servizio 26'],
-        record['Servizio 27'],
-        record['Servizio 28'],
-      ].filter(Boolean),
-    }));
+  getCompanyById(id: number) {
+    return this.getCompanies().find((company) => company.id === id);
   }
 }
